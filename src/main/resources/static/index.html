@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Livro Caixa</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f4f4;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+        }
+
+        input, select, button {
+            padding: 8px;
+            margin: 5px;
+            border-radius: 5px;
+        }
+
+        button {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #27ae60;
+        }
+
+        table {
+            width: 100%;
+            background: white;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th {
+            background: #2c3e50;
+            color: white;
+        }
+
+        td, th {
+            padding: 10px;
+            text-align: center;
+        }
+
+        tr:nth-child(even) {
+            background: #f2f2f2;
+        }
+
+        @keyframes aparecer {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        tr {
+            animation: aparecer 0.3s ease;
+        }
+    </style>
+
+</head>
+<body>
+
+<h1>💰 Livro Caixa</h1>
+
+<h3>Nova Transação</h3>
+
+<input id="descricao" placeholder="Descrição"><br><br>
+<input id="valor" type="number" placeholder="Valor"><br><br>
+<input id="data" type="datetime-local"><br><br>
+
+<select id="tipo">
+    <option value="ENTRADA">Entrada</option>
+    <option value="SAIDA">Saída</option>
+</select><br><br>
+
+<select id="formaPagamento">
+    <option value="DINHEIRO">Dinheiro</option>
+    <option value="PIX">PIX</option>
+</select><br><br>
+
+<button onclick="salvar()">Salvar</button>
+
+<p id="mensagem" style="color: green;"></p>
+
+<h2>Resumo</h2>
+
+<p>💵 Dinheiro: R$ <span id="totalDinheiro">0</span></p>
+<p>💳 PIX: R$ <span id="totalPix">0</span></p>
+<p>📊 Total Geral: R$ <span id="totalGeral">0</span></p>
+
+<h3>Filtrar por data</h3>
+
+<input type="date" id="filtroData">
+<button onclick="carregar()">Filtrar</button>
+<button onclick="limparFiltro()">Mostrar tudo</button>
+
+<table border="1">
+    <thead>
+    <tr>
+        <th>Data</th>
+        <th>Descrição</th>
+        <th>Valor</th>
+        <th>Tipo</th>
+        <th>Pagamento</th>
+        <th>Ação</th>
+    </tr>
+    </thead>
+    <tbody id="lista"></tbody>
+</table>
+
+<script>
+
+    async function deletar(id) {
+        if (!confirm("Tem certeza que deseja deletar?")) return;
+
+        await fetch(`/transacoes/${id}`, {
+            method: "DELETE"
+        });
+
+        carregar();
+    }
+
+    async function salvar() {
+        const dataInput = document.getElementById("data").value;
+
+        const transacao = {
+            descricao: document.getElementById("descricao").value,
+            valor: parseFloat(document.getElementById("valor").value),
+            tipo: document.getElementById("tipo").value,
+            formaPagamento: document.getElementById("formaPagamento").value,
+            data: dataInput ? dataInput : null
+        };
+
+        await fetch("/transacoes", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(transacao)
+        });
+
+        // mensagem
+        document.getElementById("mensagem").innerText = "✅ Salvo com sucesso!";
+        setTimeout(() => {
+            document.getElementById("mensagem").innerText = "";
+        }, 2000);
+
+        limparCampos();
+        carregar();
+    }
+
+    function limparCampos() {
+        document.getElementById("descricao").value = "";
+        document.getElementById("valor").value = "";
+        document.getElementById("data").value = "";
+    }
+
+    function limparFiltro() {
+        document.getElementById("filtroData").value = "";
+        carregar();
+    }
+
+    async function carregar() {
+
+        const filtro = document.getElementById("filtroData").value;
+
+        const resposta = await fetch("/transacoes");
+        const dados = await resposta.json();
+
+        const lista = document.getElementById("lista");
+        lista.innerHTML = "";
+
+        let totalDinheiro = 0;
+        let totalPix = 0;
+
+        dados.forEach((t, index) => {
+
+            const dataTransacao = new Date(t.data).toISOString().split("T")[0];
+
+            if (filtro && dataTransacao !== filtro) return;
+
+            if (t.tipo === "ENTRADA") {
+                t.formaPagamento === "DINHEIRO"
+                    ? totalDinheiro += t.valor
+                    : totalPix += t.valor;
+            } else {
+                t.formaPagamento === "DINHEIRO"
+                    ? totalDinheiro -= t.valor
+                    : totalPix -= t.valor;
+            }
+
+            const linha = document.createElement("tr");
+
+            linha.innerHTML = `
+                <td>${new Date(t.data).toLocaleString()}</td>
+                <td>${t.descricao}</td>
+                <td>R$ ${t.valor.toFixed(2)}</td>
+                <td>${t.tipo}</td>
+                <td>${t.formaPagamento}</td>
+                <td><button onclick="deletar(${t.id})">🗑️</button></td>
+            `;
+
+            // destaque última linha
+            if (index === dados.length - 1) {
+                linha.style.backgroundColor = "#d4edda";
+            }
+
+            lista.appendChild(linha);
+
+            // scroll automático
+            if (index === dados.length - 1) {
+                linha.scrollIntoView({ behavior: "smooth" });
+            }
+        });
+
+        document.getElementById("totalDinheiro").innerText = totalDinheiro.toFixed(2);
+        document.getElementById("totalPix").innerText = totalPix.toFixed(2);
+        document.getElementById("totalGeral").innerText = (totalDinheiro + totalPix).toFixed(2);
+    }
+
+    carregar();
+
+</script>
+
+</body>
+</html>
