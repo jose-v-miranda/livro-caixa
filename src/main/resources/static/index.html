@@ -7,93 +7,112 @@
 
     <style>
         body {
-            font-family: Arial;
-            background: #f1f3f6;
-            margin: 0;
-        }
+    font-family: Arial;
+    background: #f1f3f6;
+    margin: 0;
+}
 
-        .container {
-            max-width: 900px;
-            margin: auto;
-            padding: 15px;
-        }
+.container {
+    max-width: 900px;
+    margin: auto;
+    padding: 15px;
+}
 
-        h1 {
-            text-align: center;
-            color: #2c3e50;
-        }
+h1 {
+    text-align: center;
+    color: #2c3e50;
+}
 
-        .card {
-            background: white;
-            padding: 15px;
-            margin-bottom: 15px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
+.card {
+    background: white;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
 
-        input, select {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-        }
+input, select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
 
-        button {
-            width: 100%;
-            padding: 12px;
-            border: none;
-            border-radius: 6px;
-            background: #2ecc71;
-            color: white;
-            font-size: 16px;
-        }
+button {
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: #2ecc71;
+    color: white;
+    font-size: 15px;
+    cursor: pointer;
+    transition: 0.2s;
+}
 
-        button:hover {
-            background: #27ae60;
-        }
+button:hover {
+    background: #27ae60;
+    transform: scale(1.02);
+}
 
-        .resumo {
-            display: flex;
-            gap: 10px;
-        }
+.botoes {
+    display: flex;
+    gap: 10px;
+}
 
-        .resumo div {
-            flex: 1;
-            background: #ecf0f1;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-        }
+.botoes button {
+    flex: 1;
+}
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+.resumo {
+    display: flex;
+    gap: 10px;
+}
 
-        th {
-            background: #2c3e50;
-            color: white;
-        }
+.resumo div {
+    flex: 1;
+    background: #ecf0f1;
+    padding: 12px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 14px;
+}
 
-        td, th {
-            padding: 8px;
-            font-size: 14px;
-        }
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
 
-        tr:nth-child(even) {
-            background: #f9f9f9;
-        }
+th {
+    background: #2c3e50;
+    color: white;
+}
 
-        @media (max-width: 600px) {
-            .resumo {
-                flex-direction: column;
-            }
+td, th {
+    padding: 8px;
+    font-size: 14px;
+}
 
-            table {
-                font-size: 12px;
-            }
-        }
+tr:nth-child(even) {
+    background: #f9f9f9;
+}
+
+/* 📱 MOBILE */
+@media (max-width: 600px) {
+
+    .resumo {
+        flex-direction: column;
+    }
+
+    .botoes {
+        flex-direction: column;
+    }
+
+    table {
+        font-size: 12px;
+    }
+}
     </style>
 
 </head>
@@ -140,8 +159,11 @@
         <h3>Filtrar</h3>
 
         <input type="date" id="filtroData">
-        <button onclick="carregar()">Filtrar</button>
-        <button onclick="limparFiltro()">Mostrar tudo</button>
+
+        <div class="botoes">
+            <button onclick="carregar()">Filtrar</button>
+            <button onclick="limparFiltro()">Mostrar tudo</button>
+        </div>
     </div>
 
     <div class="card">
