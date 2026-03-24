@@ -1,13 +1,10 @@
-FROM eclipse-temurin:17-jdk
+FROM gradle:8.7-jdk17
 
 WORKDIR /app
 
 COPY . .
 
-RUN chmod +x ./gradlew
-
-# 🔥 força usar a versão correta do Gradle
-RUN ./gradlew clean build -x test --no-daemon
+RUN gradle clean build -x test
 
 EXPOSE 8080
 
