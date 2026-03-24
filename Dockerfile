@@ -4,8 +4,10 @@ WORKDIR /app
 
 COPY . .
 
-RUN chmod +x gradlew
-RUN ./gradlew build -x test
+RUN chmod +x ./gradlew
+
+# 🔥 força usar a versão correta do Gradle
+RUN ./gradlew clean build -x test --no-daemon
 
 EXPOSE 8080
 
