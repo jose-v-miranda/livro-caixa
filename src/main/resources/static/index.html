@@ -74,7 +74,6 @@
             text-align: center;
         }
 
-        /* 📊 TABELA RESPONSIVA */
         .tabela-container {
             overflow-x: auto;
         }
@@ -95,7 +94,6 @@
             text-align: center;
         }
 
-        /* cores */
         .entrada {
             color: #2ecc71;
             font-weight: bold;
@@ -106,7 +104,6 @@
             font-weight: bold;
         }
 
-        /* botão flutuante */
         .fab {
             position: fixed;
             bottom: 20px;
@@ -120,19 +117,18 @@
             border: none;
         }
 
-        /* mobile */
+        /* 📅 cabeçalho de mês clicável */
+        .mes-header {
+            background: #bdc3c7;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
         @media (max-width: 600px) {
-
-            .resumo {
-                flex-direction: column;
-            }
-
-            .botoes {
-                flex-direction: column;
-            }
+            .resumo { flex-direction: column; }
+            .botoes { flex-direction: column; }
         }
     </style>
-
 </head>
 
 <body>
@@ -207,31 +203,31 @@
 
 </div>
 
-<!-- botão flutuante -->
-<button class="fab" onclick="window.scrollTo({top:0, behavior:'smooth'})">+</button>
+<button class="fab" onclick="document.getElementById('descricao').focus()">+</button>
 
 <script>
 
     async function deletar(id) {
         if (!confirm("Tem certeza que deseja deletar?")) return;
 
-        await fetch(`/transacoes/${id}`, {
-            method: "DELETE"
-        });
-
+        await fetch(`/transacoes/${id}`, { method: "DELETE" });
         carregar();
     }
 
     async function salvar() {
-        const dataInput = document.getElementById("data").value;
 
         const transacao = {
             descricao: document.getElementById("descricao").value,
             valor: parseFloat(document.getElementById("valor").value),
             tipo: document.getElementById("tipo").value,
             formaPagamento: document.getElementById("formaPagamento").value,
-            data: dataInput ? dataInput : null
+            data: document.getElementById("data").value || null
         };
+
+        if (!transacao.descricao || !transacao.valor) {
+            alert("Preencha os campos!");
+            return;
+        }
 
         await fetch("/transacoes", {
             method: "POST",
@@ -239,10 +235,8 @@
             body: JSON.stringify(transacao)
         });
 
-        document.getElementById("mensagem").innerText = "✅ Salvo com sucesso!";
-        setTimeout(() => {
-            document.getElementById("mensagem").innerText = "";
-        }, 2000);
+        document.getElementById("mensagem").innerText = "✅ Salvo!";
+        setTimeout(() => document.getElementById("mensagem").innerText = "", 2000);
 
         limparCampos();
         carregar();
@@ -251,7 +245,6 @@
     function limparCampos() {
         document.getElementById("descricao").value = "";
         document.getElementById("valor").value = "";
-        document.getElementById("data").value = "";
     }
 
     function limparFiltro() {
@@ -267,46 +260,97 @@
         const dados = await resposta.json();
 
         const lista = document.getElementById("lista");
-        lista.innerHTML = "";
+        lista.innerHTML = "<tr><td colspan='6'>Carregando...</td></tr>";
 
         let totalDinheiro = 0;
         let totalPix = 0;
 
-        dados.forEach((t, index) => {
+        dados.sort((a, b) => new Date(b.data) - new Date(a.data));
 
-            const dataTransacao = new Date(t.data).toISOString().split("T")[0];
+        const grupos = {};
 
-            if (filtro && dataTransacao !== filtro) return;
+        dados.forEach(t => {
 
-            if (t.tipo === "ENTRADA") {
-                t.formaPagamento === "DINHEIRO"
-                    ? totalDinheiro += t.valor
-                    : totalPix += t.valor;
-            } else {
-                t.formaPagamento === "DINHEIRO"
-                    ? totalDinheiro -= t.valor
-                    : totalPix -= t.valor;
-            }
+            const d = new Date(t.data);
 
-            const linha = document.createElement("tr");
+            const dataFormatada =
+                d.getFullYear() + "-" +
+                String(d.getMonth()+1).padStart(2,'0') + "-" +
+                String(d.getDate()).padStart(2,'0');
 
-            linha.innerHTML = `
-                <td>${new Date(t.data).toLocaleString()}</td>
-                <td>${t.descricao}</td>
-                <td class="${t.tipo === 'ENTRADA' ? 'entrada' : 'saida'}">
-                    R$ ${t.valor.toFixed(2)}
-                </td>
-                <td>${t.tipo}</td>
-                <td>${t.formaPagamento}</td>
-                <td><button onclick="deletar(${t.id})">🗑️</button></td>
+            if (filtro && dataFormatada !== filtro) return;
+
+            const chave = d.getFullYear() + "-" + (d.getMonth()+1);
+
+            if (!grupos[chave]) grupos[chave] = [];
+
+            grupos[chave].push(t);
+        });
+
+        lista.innerHTML = "";
+
+        for (let chave in grupos) {
+
+            const [ano, mes] = chave.split("-");
+            const nomeMes = new Date(ano, mes-1)
+                .toLocaleString("pt-BR", { month: "long" });
+
+            const header = document.createElement("tr");
+            header.classList.add("mes-header");
+
+            header.innerHTML = `
+                <td colspan="6">📅 ${nomeMes.toUpperCase()} ${ano} ▼</td>
             `;
 
-            lista.appendChild(linha);
-        });
+            lista.appendChild(header);
+
+            let visivel = true;
+
+            header.onclick = () => {
+                visivel = !visivel;
+                linhasMes.forEach(l => l.style.display = visivel ? "" : "none");
+                header.cells[0].innerText =
+                    `📅 ${nomeMes.toUpperCase()} ${ano} ${visivel ? "▼" : "▶"}`;
+            };
+
+            const linhasMes = [];
+
+            grupos[chave]
+            .sort((a, b) => new Date(b.data) - new Date(a.data))
+            .forEach(t => {
+
+                if (t.tipo === "ENTRADA") {
+                    t.formaPagamento === "DINHEIRO"
+                        ? totalDinheiro += t.valor
+                        : totalPix += t.valor;
+                } else {
+                    t.formaPagamento === "DINHEIRO"
+                        ? totalDinheiro -= t.valor
+                        : totalPix -= t.valor;
+                }
+
+                const linha = document.createElement("tr");
+
+                linha.innerHTML = `
+                    <td>${new Date(t.data).toLocaleString()}</td>
+                    <td>${t.descricao}</td>
+                    <td class="${t.tipo === 'ENTRADA' ? 'entrada' : 'saida'}">
+                        R$ ${t.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td>${t.tipo}</td>
+                    <td>${t.formaPagamento}</td>
+                    <td><button onclick="deletar(${t.id})">🗑️</button></td>
+                `;
+
+                linhasMes.push(linha);
+                lista.appendChild(linha);
+            });
+        }
 
         document.getElementById("totalDinheiro").innerText = totalDinheiro.toFixed(2);
         document.getElementById("totalPix").innerText = totalPix.toFixed(2);
-        document.getElementById("totalGeral").innerText = (totalDinheiro + totalPix).toFixed(2);
+        document.getElementById("totalGeral").innerText =
+            (totalDinheiro + totalPix).toFixed(2);
     }
 
     carregar();
