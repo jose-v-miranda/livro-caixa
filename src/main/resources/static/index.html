@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Livro Caixa</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -196,11 +194,6 @@
     </div>
 
     <div class="card">
-        <h3>📊 Gráfico</h3>
-        <canvas id="grafico"></canvas>
-    </div>
-
-    <div class="card">
         <h3>Filtrar</h3>
 
         <input type="date" id="filtroData">
@@ -241,7 +234,6 @@
 <button class="fab" onclick="document.getElementById('descricao').focus()">+</button>
 
 <script>
-    let grafico = null;
     let tabelaVisivel = true;
     const estadoMes = {};
     const estadoDia = {};
@@ -275,64 +267,6 @@
         return dataObj.getFullYear() + "-" +
             String(dataObj.getMonth() + 1).padStart(2, "0") + "-" +
             String(dataObj.getDate()).padStart(2, "0");
-    }
-
-    function atualizarGrafico(transacoes) {
-        const mapa = {};
-
-        transacoes.forEach(t => {
-            const d = obterDataValida(t);
-            const dia = chaveDia(d);
-
-            if (!mapa[dia]) {
-                mapa[dia] = 0;
-            }
-
-            if (t.tipo === "ENTRADA") {
-                mapa[dia] += Number(t.valor);
-            } else {
-                mapa[dia] -= Number(t.valor);
-            }
-        });
-
-        const labels = Object.keys(mapa).sort((a, b) => new Date(a) - new Date(b));
-        const valores = labels.map(label => mapa[label]);
-
-        const ctx = document.getElementById("grafico");
-
-        if (grafico) {
-            grafico.destroy();
-        }
-
-        grafico = new Chart(ctx, {
-            type: "line",
-            data: {
-                labels: labels.map(d => {
-                    const [ano, mes, dia] = d.split("-");
-                    return `${dia}/${mes}/${ano}`;
-                }),
-                datasets: [{
-                    label: "Saldo por dia",
-                    data: valores,
-                    tension: 0.25,
-                    fill: false
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: true
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: false
-                    }
-                }
-            }
-        });
     }
 
     async function deletar(id) {
@@ -433,8 +367,6 @@
             const dataFiltro = dataLocalParaFiltro(d);
             return !filtro || dataFiltro === filtro;
         });
-
-        atualizarGrafico(transacoesFiltradas);
 
         const gruposMes = {};
 
