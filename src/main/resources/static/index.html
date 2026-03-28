@@ -5,21 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Livro Caixa</title>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         body {
-            font-family: Arial;
+            font-family: Arial, sans-serif;
             background: #f1f3f6;
             margin: 0;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: auto;
             padding: 15px;
         }
 
         h1 {
             text-align: center;
+            margin-top: 10px;
         }
 
         .card {
@@ -36,6 +39,7 @@
             margin-bottom: 10px;
             border-radius: 8px;
             border: 1px solid #ccc;
+            box-sizing: border-box;
         }
 
         button {
@@ -55,10 +59,12 @@
         .botoes {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
         }
 
         .botoes button {
             flex: 1;
+            min-width: 160px;
         }
 
         .resumo {
@@ -79,7 +85,7 @@
         }
 
         table {
-            min-width: 600px;
+            min-width: 700px;
             width: 100%;
             border-collapse: collapse;
         }
@@ -92,6 +98,7 @@
         td, th {
             padding: 8px;
             text-align: center;
+            border-bottom: 1px solid #e6e6e6;
         }
 
         .entrada {
@@ -115,18 +122,37 @@
             height: 60px;
             font-size: 30px;
             border: none;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.18);
         }
 
-        /* 📅 cabeçalho de mês clicável */
         .mes-header {
-            background: #bdc3c7;
+            background: #dfe6e9;
             font-weight: bold;
             cursor: pointer;
+            user-select: none;
+        }
+
+        .dia-header {
+            background: #f4f6f8;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .toggle-info {
+            font-size: 13px;
+            color: #666;
+            margin-top: 8px;
         }
 
         @media (max-width: 600px) {
-            .resumo { flex-direction: column; }
-            .botoes { flex-direction: column; }
+            .resumo {
+                flex-direction: column;
+            }
+
+            .botoes {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
@@ -141,7 +167,7 @@
         <h3>Nova Transação</h3>
 
         <input id="descricao" placeholder="Descrição">
-        <input id="valor" type="number" placeholder="Valor">
+        <input id="valor" type="number" placeholder="Valor" step="0.01">
         <input id="data" type="datetime-local">
 
         <select id="tipo">
@@ -163,10 +189,15 @@
         <h3>Resumo</h3>
 
         <div class="resumo">
-            <div>💵 Dinheiro<br><b id="totalDinheiro">0</b></div>
-            <div>💳 PIX<br><b id="totalPix">0</b></div>
-            <div>📊 Total<br><b id="totalGeral">0</b></div>
+            <div>💵 Dinheiro<br><b id="totalDinheiro">R$ 0,00</b></div>
+            <div>💳 PIX<br><b id="totalPix">R$ 0,00</b></div>
+            <div>📊 Total<br><b id="totalGeral">R$ 0,00</b></div>
         </div>
+    </div>
+
+    <div class="card">
+        <h3>📊 Gráfico</h3>
+        <canvas id="grafico"></canvas>
     </div>
 
     <div class="card">
@@ -177,13 +208,18 @@
         <div class="botoes">
             <button onclick="carregar()">Filtrar</button>
             <button onclick="limparFiltro()">Mostrar tudo</button>
+            <button onclick="toggleTabela()" id="btnTabela">Esconder tabela</button>
+        </div>
+
+        <div class="toggle-info">
+            Clique no mês para abrir/fechar os dias. Clique no dia para abrir/fechar as transações.
         </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="cardTabela">
         <h3>Transações</h3>
 
-        <div class="tabela-container">
+        <div class="tabela-container" id="tabelaContainer">
             <table>
                 <thead>
                 <tr>
@@ -198,7 +234,6 @@
                 <tbody id="lista"></tbody>
             </table>
         </div>
-
     </div>
 
 </div>
@@ -206,28 +241,129 @@
 <button class="fab" onclick="document.getElementById('descricao').focus()">+</button>
 
 <script>
+    let grafico = null;
+    let tabelaVisivel = true;
+    const estadoMes = {};
+    const estadoDia = {};
+
+    function formatarBRL(valor) {
+        return new Intl.NumberFormat("pt-BR", {
+            style: "currency",
+            currency: "BRL"
+        }).format(valor);
+    }
+
+    function obterDataValida(transacao) {
+        const d = new Date(transacao.data);
+        if (isNaN(d.getTime())) {
+            return new Date();
+        }
+        return d;
+    }
+
+    function chaveMes(dataObj) {
+        return dataObj.getFullYear() + "-" + String(dataObj.getMonth() + 1).padStart(2, "0");
+    }
+
+    function chaveDia(dataObj) {
+        return dataObj.getFullYear() + "-" +
+            String(dataObj.getMonth() + 1).padStart(2, "0") + "-" +
+            String(dataObj.getDate()).padStart(2, "0");
+    }
+
+    function dataLocalParaFiltro(dataObj) {
+        return dataObj.getFullYear() + "-" +
+            String(dataObj.getMonth() + 1).padStart(2, "0") + "-" +
+            String(dataObj.getDate()).padStart(2, "0");
+    }
+
+    function atualizarGrafico(transacoes) {
+        const mapa = {};
+
+        transacoes.forEach(t => {
+            const d = obterDataValida(t);
+            const dia = chaveDia(d);
+
+            if (!mapa[dia]) {
+                mapa[dia] = 0;
+            }
+
+            if (t.tipo === "ENTRADA") {
+                mapa[dia] += Number(t.valor);
+            } else {
+                mapa[dia] -= Number(t.valor);
+            }
+        });
+
+        const labels = Object.keys(mapa).sort((a, b) => new Date(a) - new Date(b));
+        const valores = labels.map(label => mapa[label]);
+
+        const ctx = document.getElementById("grafico");
+
+        if (grafico) {
+            grafico.destroy();
+        }
+
+        grafico = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: labels.map(d => {
+                    const [ano, mes, dia] = d.split("-");
+                    return `${dia}/${mes}/${ano}`;
+                }),
+                datasets: [{
+                    label: "Saldo por dia",
+                    data: valores,
+                    tension: 0.25,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+    }
 
     async function deletar(id) {
         if (!confirm("Tem certeza que deseja deletar?")) return;
 
-        await fetch(`/transacoes/${id}`, { method: "DELETE" });
+        await fetch(`/transacoes/${id}`, {
+            method: "DELETE"
+        });
+
         carregar();
     }
 
     async function salvar() {
+        const descricao = document.getElementById("descricao").value.trim();
+        const valor = parseFloat(document.getElementById("valor").value);
+        const tipo = document.getElementById("tipo").value;
+        const formaPagamento = document.getElementById("formaPagamento").value;
+        const dataInput = document.getElementById("data").value;
 
-        const transacao = {
-            descricao: document.getElementById("descricao").value,
-            valor: parseFloat(document.getElementById("valor").value),
-            tipo: document.getElementById("tipo").value,
-            formaPagamento: document.getElementById("formaPagamento").value,
-            data: document.getElementById("data").value || null
-        };
-
-        if (!transacao.descricao || !transacao.valor) {
-            alert("Preencha os campos!");
+        if (!descricao || isNaN(valor)) {
+            alert("Preencha a descrição e o valor.");
             return;
         }
+
+        const transacao = {
+            descricao: descricao,
+            valor: valor,
+            tipo: tipo,
+            formaPagamento: formaPagamento,
+            data: dataInput ? dataInput : null
+        };
 
         await fetch("/transacoes", {
             method: "POST",
@@ -235,8 +371,10 @@
             body: JSON.stringify(transacao)
         });
 
-        document.getElementById("mensagem").innerText = "✅ Salvo!";
-        setTimeout(() => document.getElementById("mensagem").innerText = "", 2000);
+        document.getElementById("mensagem").innerText = "✅ Salvo com sucesso!";
+        setTimeout(() => {
+            document.getElementById("mensagem").innerText = "";
+        }, 2000);
 
         limparCampos();
         carregar();
@@ -252,109 +390,150 @@
         carregar();
     }
 
-    async function carregar() {
+    function toggleTabela() {
+        tabelaVisivel = !tabelaVisivel;
 
+        const container = document.getElementById("tabelaContainer");
+        const btn = document.getElementById("btnTabela");
+
+        container.style.display = tabelaVisivel ? "block" : "none";
+        btn.innerText = tabelaVisivel ? "Esconder tabela" : "Mostrar tabela";
+    }
+
+    function toggleMes(mesKey) {
+        estadoMes[mesKey] = !(estadoMes[mesKey] !== false);
+        carregar();
+    }
+
+    function toggleDia(diaKey) {
+        estadoDia[diaKey] = !(estadoDia[diaKey] !== false);
+        carregar();
+    }
+
+    async function carregar() {
         const filtro = document.getElementById("filtroData").value;
 
         const resposta = await fetch("/transacoes");
         const dados = await resposta.json();
 
         const lista = document.getElementById("lista");
-        lista.innerHTML = "<tr><td colspan='6'>Carregando...</td></tr>";
+        lista.innerHTML = "";
 
         let totalDinheiro = 0;
         let totalPix = 0;
 
-        dados.sort((a, b) => new Date(b.data) - new Date(a.data));
-
-        const grupos = {};
-
-        dados.forEach(t => {
-
-            const d = new Date(t.data);
-
-            const dataFormatada =
-                d.getFullYear() + "-" +
-                String(d.getMonth()+1).padStart(2,'0') + "-" +
-                String(d.getDate()).padStart(2,'0');
-
-            if (filtro && dataFormatada !== filtro) return;
-
-            const chave = d.getFullYear() + "-" + (d.getMonth()+1);
-
-            if (!grupos[chave]) grupos[chave] = [];
-
-            grupos[chave].push(t);
+        dados.sort((a, b) => {
+            const da = obterDataValida(a).getTime();
+            const db = obterDataValida(b).getTime();
+            return db - da;
         });
 
-        lista.innerHTML = "";
+        const transacoesFiltradas = dados.filter(t => {
+            const d = obterDataValida(t);
+            const dataFiltro = dataLocalParaFiltro(d);
+            return !filtro || dataFiltro === filtro;
+        });
 
-        for (let chave in grupos) {
+        atualizarGrafico(transacoesFiltradas);
 
-            const [ano, mes] = chave.split("-");
-            const nomeMes = new Date(ano, mes-1)
-                .toLocaleString("pt-BR", { month: "long" });
+        const gruposMes = {};
 
-            const header = document.createElement("tr");
-            header.classList.add("mes-header");
+        transacoesFiltradas.forEach(t => {
+            const d = obterDataValida(t);
+            const mes = chaveMes(d);
+            const dia = chaveDia(d);
 
-            header.innerHTML = `
-                <td colspan="6">📅 ${nomeMes.toUpperCase()} ${ano} ▼</td>
-            `;
+            if (!gruposMes[mes]) {
+                gruposMes[mes] = {};
+            }
 
-            lista.appendChild(header);
+            if (!gruposMes[mes][dia]) {
+                gruposMes[mes][dia] = [];
+            }
 
-            let visivel = true;
+            gruposMes[mes][dia].push(t);
+        });
 
-            header.onclick = () => {
-                visivel = !visivel;
-                linhasMes.forEach(l => l.style.display = visivel ? "" : "none");
-                header.cells[0].innerText =
-                    `📅 ${nomeMes.toUpperCase()} ${ano} ${visivel ? "▼" : "▶"}`;
-            };
+        const mesesOrdenados = Object.keys(gruposMes).sort((a, b) => new Date(b + "-01") - new Date(a + "-01"));
 
-            const linhasMes = [];
-
-            grupos[chave]
-            .sort((a, b) => new Date(b.data) - new Date(a.data))
-            .forEach(t => {
-
-                if (t.tipo === "ENTRADA") {
-                    t.formaPagamento === "DINHEIRO"
-                        ? totalDinheiro += t.valor
-                        : totalPix += t.valor;
-                } else {
-                    t.formaPagamento === "DINHEIRO"
-                        ? totalDinheiro -= t.valor
-                        : totalPix -= t.valor;
-                }
-
-                const linha = document.createElement("tr");
-
-                linha.innerHTML = `
-                    <td>${new Date(t.data).toLocaleString()}</td>
-                    <td>${t.descricao}</td>
-                    <td class="${t.tipo === 'ENTRADA' ? 'entrada' : 'saida'}">
-                        R$ ${t.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td>${t.tipo}</td>
-                    <td>${t.formaPagamento}</td>
-                    <td><button onclick="deletar(${t.id})">🗑️</button></td>
-                `;
-
-                linhasMes.push(linha);
-                lista.appendChild(linha);
-            });
+        if (mesesOrdenados.length === 0) {
+            const linhaVazia = document.createElement("tr");
+            linhaVazia.innerHTML = `<td colspan="6">Nenhuma transação encontrada.</td>`;
+            lista.appendChild(linhaVazia);
         }
 
-        document.getElementById("totalDinheiro").innerText = totalDinheiro.toFixed(2);
-        document.getElementById("totalPix").innerText = totalPix.toFixed(2);
-        document.getElementById("totalGeral").innerText =
-            (totalDinheiro + totalPix).toFixed(2);
+        mesesOrdenados.forEach(mesKey => {
+            const [ano, mes] = mesKey.split("-");
+            const nomeMes = new Date(Number(ano), Number(mes) - 1, 1)
+                .toLocaleString("pt-BR", { month: "long" });
+
+            const mesAberto = estadoMes[mesKey] !== false;
+
+            const linhaMes = document.createElement("tr");
+            linhaMes.className = "mes-header";
+            linhaMes.innerHTML = `
+                <td colspan="6">📅 ${nomeMes.toUpperCase()} ${ano} ${mesAberto ? "▼" : "▶"}</td>
+            `;
+            linhaMes.onclick = () => toggleMes(mesKey);
+            lista.appendChild(linhaMes);
+
+            const diasOrdenados = Object.keys(gruposMes[mesKey]).sort((a, b) => new Date(b) - new Date(a));
+
+            diasOrdenados.forEach(diaKey => {
+                const diaAberto = estadoDia[diaKey] !== false;
+                const mostrarDia = mesAberto && diaAberto;
+
+                const [anoD, mesD, diaD] = diaKey.split("-");
+                const dataDia = new Date(Number(anoD), Number(mesD) - 1, Number(diaD));
+
+                const linhaDia = document.createElement("tr");
+                linhaDia.className = "dia-header";
+                linhaDia.style.display = mesAberto ? "" : "none";
+                linhaDia.innerHTML = `
+                    <td colspan="6">📆 ${dataDia.toLocaleDateString("pt-BR")} ${diaAberto ? "▼" : "▶"}</td>
+                `;
+                linhaDia.onclick = () => toggleDia(diaKey);
+                lista.appendChild(linhaDia);
+
+                gruposMes[mesKey][diaKey]
+                    .sort((a, b) => obterDataValida(b).getTime() - obterDataValida(a).getTime())
+                    .forEach(t => {
+                        const d = obterDataValida(t);
+                        const valorNumero = Number(t.valor);
+
+                        if (t.tipo === "ENTRADA") {
+                            t.formaPagamento === "DINHEIRO"
+                                ? totalDinheiro += valorNumero
+                                : totalPix += valorNumero;
+                        } else {
+                            t.formaPagamento === "DINHEIRO"
+                                ? totalDinheiro -= valorNumero
+                                : totalPix -= valorNumero;
+                        }
+
+                        const linha = document.createElement("tr");
+                        linha.style.display = mostrarDia ? "" : "none";
+                        linha.innerHTML = `
+                            <td>${d.toLocaleString("pt-BR")}</td>
+                            <td>${t.descricao}</td>
+                            <td class="${t.tipo === 'ENTRADA' ? 'entrada' : 'saida'}">
+                                ${formatarBRL(valorNumero)}
+                            </td>
+                            <td>${t.tipo}</td>
+                            <td>${t.formaPagamento}</td>
+                            <td><button onclick="deletar(${t.id})">🗑️</button></td>
+                        `;
+                        lista.appendChild(linha);
+                    });
+            });
+        });
+
+        document.getElementById("totalDinheiro").innerText = formatarBRL(totalDinheiro);
+        document.getElementById("totalPix").innerText = formatarBRL(totalPix);
+        document.getElementById("totalGeral").innerText = formatarBRL(totalDinheiro + totalPix);
     }
 
     carregar();
-
 </script>
 
 </body>
