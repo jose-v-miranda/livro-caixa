@@ -335,12 +335,12 @@
     }
 
     function toggleMes(mesKey) {
-        estadoMes[mesKey] = !(estadoMes[mesKey] !== false);
+        estadoMes[mesKey] = !(estadoMes[mesKey] === true);
         carregar();
     }
 
     function toggleDia(diaKey) {
-        estadoDia[diaKey] = !(estadoDia[diaKey] !== false);
+        estadoDia[diaKey] = !(estadoDia[diaKey] === true);
         carregar();
     }
 
@@ -399,7 +399,7 @@
             const nomeMes = new Date(Number(ano), Number(mes) - 1, 1)
                 .toLocaleString("pt-BR", { month: "long" });
 
-            const mesAberto = estadoMes[mesKey] !== false;
+            const mesAberto = estadoMes[mesKey] === true;
 
             const linhaMes = document.createElement("tr");
             linhaMes.className = "mes-header";
@@ -412,7 +412,7 @@
             const diasOrdenados = Object.keys(gruposMes[mesKey]).sort((a, b) => new Date(b) - new Date(a));
 
             diasOrdenados.forEach(diaKey => {
-                const diaAberto = estadoDia[diaKey] !== false;
+                const diaAberto = estadoDia[diaKey] === true;
                 const mostrarDia = mesAberto && diaAberto;
 
                 const [anoD, mesD, diaD] = diaKey.split("-");
