@@ -30,6 +30,12 @@ public class TransacaoController {
         return repository.findAll();
     }
 
+    @PutMapping("/{id}")
+    public Transacao atualizar(@PathVariable Long id, @RequestBody Transacao transacao) {
+        transacao.setId(id);
+        return repository.save(transacao);
+    }
+
     @DeleteMapping("/{id}")
     public void deletar(@PathVariable Long id) {
         repository.deleteById(id);
